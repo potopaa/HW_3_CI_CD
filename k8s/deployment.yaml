@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: hello-gitops
+  name: hello-gitops
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hello-gitops
+  template:
+    metadata:
+      labels:
+        app: hello-gitops
+    spec:
+      containers:
+        - image: potopaa/hello-gitops:c0acea58b56f39fe322a81546c1fad0a18d2c0c7 
+          name: hello-gitops
+          ports:
+            - name: http
+              containerPort: 8050
+
