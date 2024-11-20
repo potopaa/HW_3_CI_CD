@@ -8,4 +8,4 @@ namespace: hello-gitops
 images:
 - name: hello-gitops
   newName: potopaa/hello-gitops
-  newTag: c0acea58b56f39fe322a81546c1fad0a18d2c0c7
+  newTag: latest
