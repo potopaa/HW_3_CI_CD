@@ -62,3 +62,4 @@ jobs:
     - name: Apply Kubernetes manifests
       run: |
         kubectl apply -k .
+
