@@ -55,6 +55,9 @@ jobs:
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/hello-gitops:green
 
+    - name: Cleanup local Docker images
+      run: docker system prune -f
+
   deploy-to-eks:
     runs-on: ubuntu-latest
     needs: build-and-push-docker
@@ -71,6 +74,10 @@ jobs:
 
     - name: Update kubeconfig
       run: aws eks update-kubeconfig --region us-east-1 --name hello-gitops-new
+
+    - name: Create Namespace
+      run: |
+        kubectl create namespace hello-gitops || echo "Namespace already exists"
 
     - name: Deploy Blue
       run: kubectl apply -f deployment—blue.yaml
@@ -90,3 +97,15 @@ jobs:
 
     - name: Switch Traffic to Green
       run: kubectl patch service hello-gitops -n hello-gitops -p '{"spec":{"selector":{"app":"hello-gitops","version":"green"}}}'
+
+    - name: Validate Green Deployment
+      run: |
+        service=$(kubectl get svc hello-gitops -n hello-gitops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        for i in {1..10}; do
+          curl -s "http://$service" || exit 1
+          sleep 1
+        done
+
+    - name: Rollback to Blue
+      if: failure()
+      run: kubectl patch service hello-gitops -n hello-gitops -p '{"spec":{"selector":{"app":"hello-gitops","version":"blue"}}}'
