@@ -1,13 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hello-gitops-v1
+  name: hello-gitops
+  namespace: hello-gitops
   labels:
     app: hello-gitops
+    version: v1.0.0
 spec:
   replicas: 3
   selector:
     matchLabels:
+      app: hello-gitops
       version: v1.0.0
   template:
     metadata:
@@ -17,6 +20,6 @@ spec:
     spec:
       containers:
       - name: hello-gitops
-        image: <docker-image-placeholder>
+        image: your-dockerhub-username/hello-gitops:v1
         ports:
         - containerPort: 8050
