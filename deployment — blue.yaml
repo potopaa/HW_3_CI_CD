@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: hello-gitops
-        image: <your-docker-image>:blue  # Blue
+        image: <your-docker-image>:blue
         ports:
         - containerPort: 80
