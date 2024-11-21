@@ -4,8 +4,7 @@ resources:
 - deployment.yaml
 - service.yaml
 - ingress.yaml
-namespace: hello-gitops
 images:
 - name: hello-gitops
-  newName: potopaa/hello-gitops
-  newTag: d846c834abaa1fe1f4f8fd3bb3a8ab1761e4d6a2
+  newName: <docker-image-placeholder>
+  newTag: latest
