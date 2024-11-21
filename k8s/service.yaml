@@ -2,9 +2,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: hello-gitops
+  namespace: hello-gitops
 spec:
   selector:
-    version: v1.0.0
+    app: hello-gitops
+    version: v1.0.0  # Сначала направляем трафик на v1
   ports:
   - protocol: TCP
     port: 80
