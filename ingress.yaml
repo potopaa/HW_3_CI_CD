@@ -4,11 +4,10 @@ metadata:
   name: hello-gitops
   namespace: hello-gitops
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    kubernetes.io/ingress.class: "nginx"
 spec:
-  ingressClassName: nginx # to change
   rules:
-  - host: hello-gitops.example.com # to set
+  - host: hello-gitops.example.com  # виправити
     http:
       paths:
       - path: /
