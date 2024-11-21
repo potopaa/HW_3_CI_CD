@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: hello-gitops
-        image: <your-docker-image>:green  # Укажите тег Green
+        image: <your-docker-image>:green  # Green
         ports:
         - containerPort: 80
