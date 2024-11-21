@@ -10,4 +10,3 @@ USER webservice:webservice
 EXPOSE 8050
 
 CMD ["python", "hello.py"]
-
