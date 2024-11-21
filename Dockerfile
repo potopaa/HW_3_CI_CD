@@ -1,11 +1,9 @@
-FROM python:3.7-slim
+FROM python:3.9-slim
 
 WORKDIR /app
-RUN groupadd -r webservice && useradd --no-log-init -r -g webservice webservice
-COPY . .
-RUN pip install -r requirements.txt
+COPY app/ /app/
+COPY config.properties /app/
 
-USER webservice:webservice
+RUN pip install -r /app/requirements.txt
 
-EXPOSE 8050
-CMD ["python", "hello.py"]
+CMD ["python", "/app/hello.py"]
