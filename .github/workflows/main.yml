@@ -52,7 +52,7 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --region us-east-1 --name hello-gitops
+          aws eks update-kubeconfig --region us-east-1 --name hello-gitops-new
 
       - name: Deploy Kubernetes Resources
         run: |
