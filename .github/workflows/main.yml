@@ -89,6 +89,7 @@ jobs:
           service=$(kubectl get svc hello-gitops -n hello-gitops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
           if [[ -n "$service" ]]; then
             echo "LoadBalancer ready: $service"
+            echo "::set-output name=service_url::$service"
             exit 0
           fi
           echo "Waiting for LoadBalancer to be ready..."
