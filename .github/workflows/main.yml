@@ -23,10 +23,15 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker Image
+      - name: Build and Push Docker Image for v1
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/hello-gitops:${{ github.sha }} .
-          docker push ${{ secrets.DOCKER_USERNAME }}/hello-gitops:${{ github.sha }}
+          docker build -t your-dockerhub-username/hello-gitops:v1 .
+          docker push your-dockerhub-username/hello-gitops:v1
+
+      - name: Build and Push Docker Image for v2
+        run: |
+          docker build -t your-dockerhub-username/hello-gitops:v2 .
+          docker push your-dockerhub-username/hello-gitops:v2
 
   deploy-to-eks:
     name: Deploy to EKS
@@ -58,10 +63,10 @@ jobs:
         run: |
           kubectl apply -k ./k8s/
 
-      - name: Switch Traffic to New Version
+      - name: Switch Traffic to v2
         run: |
           kubectl patch service hello-gitops -n hello-gitops -p '{"spec":{"selector":{"version":"v2.0.0"}}}'
 
-      - name: Verify Deployment
+      - name: Verify Deployment v2
         run: |
           kubectl rollout status deployment/hello-gitops-v2 -n hello-gitops
