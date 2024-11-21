@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   labels:
     app: hello-gitops
+    version: blue
   name: hello-gitops
 spec:
   replicas: 3
