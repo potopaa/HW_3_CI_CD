@@ -3,10 +3,9 @@ kind: Deployment
 metadata:
   labels:
     app: hello-gitops
-    version: blue
   name: hello-gitops
 spec:
-  replicas: 3
+  replicas: 5
   selector:
     matchLabels:
       app: hello-gitops
@@ -16,7 +15,7 @@ spec:
         app: hello-gitops
     spec:
       containers:
-        - image: potopaa/hello-gitops:latest
+        - image: hello-gitops
           name: hello-gitops
           ports:
             - name: http
