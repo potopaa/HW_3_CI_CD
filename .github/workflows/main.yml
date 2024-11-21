@@ -89,10 +89,9 @@ jobs:
           service=$(kubectl get svc hello-gitops -n hello-gitops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
           if [[ -n "$service" ]]; then
             echo "LoadBalancer ready: $service"
-            echo "::set-output name=service_url::$service"
             exit 0
           fi
-          echo "Waiting for LoadBalancer to be ready..."
+          echo "Waiting for LoadBalancer..."
           sleep 10
         done
         echo "Error: LoadBalancer not ready"
@@ -116,6 +115,13 @@ jobs:
           exit 1
         fi
         for i in {1..10}; do
-          curl -s "http://$service" || exit 1
-          sleep 1
+          status=$(curl -o /dev/null -s -w "%{http_code}" "http://$service")
+          if [[ "$status" == "200" ]]; then
+            echo "Application is accessible: $service"
+            exit 0
+          fi
+          echo "Waiting for application to be accessible..."
+          sleep 10
         done
+        echo "Error: Application is not accessible."
+        exit 1
