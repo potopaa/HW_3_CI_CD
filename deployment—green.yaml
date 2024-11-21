@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: hello-gitops
-        image: <your-docker-image>:green  # Green
+        image: potopaa/hello-gitops:green
         ports:
         - containerPort: 80
