@@ -6,9 +6,9 @@ metadata:
 spec:
   selector:
     app: hello-gitops
-    version: v1.0.0  # Сначала направляем трафик на v1
+    version: blue
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 8050
-  type: ClusterIP
+    targetPort: 80
+  type: LoadBalancer

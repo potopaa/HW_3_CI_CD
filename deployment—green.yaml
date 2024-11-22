@@ -1,25 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hello-gitops
+  name: hello-gitops-green
   namespace: hello-gitops
-  labels:
-    app: hello-gitops
-    version: v1.0.0
 spec:
   replicas: 3
   selector:
     matchLabels:
       app: hello-gitops
-      version: v1.0.0
+      version: green
   template:
     metadata:
       labels:
         app: hello-gitops
-        version: v1.0.0
+        version: green
     spec:
       containers:
       - name: hello-gitops
-        image: your-dockerhub-username/hello-gitops:v1
+        image: potopaa/hello-gitops:green
         ports:
-        - containerPort: 8050
+        - containerPort: 80
