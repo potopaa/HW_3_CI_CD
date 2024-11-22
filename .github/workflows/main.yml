@@ -72,36 +72,60 @@ jobs:
       id: active-version
       run: |
         active_version=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.spec.selector.version}')
+        if [[ -z "$active_version" ]]; then
+          echo "No active version detected. Defaulting to blue."
+          active_version="blue"
+        fi
         echo "active_version=${active_version}" >> $GITHUB_ENV
+        echo "Current active version: ${active_version}"
 
     - name: Deploy next version
       run: |
         if [[ "$active_version" == "blue" ]]; then
+          echo "Deploying Green version"
           kubectl apply -f deployment-green.yaml -n hello-gitops-new
         else
+          echo "Deploying Blue version"
           kubectl apply -f deployment-blue.yaml -n hello-gitops-new
         fi
 
     - name: Wait for rollout
       run: |
         if [[ "$active_version" == "blue" ]]; then
-          kubectl rollout status deployment/hello-gitops-green -n hello-gitops-new --timeout=120s
+          echo "Waiting for Green deployment rollout"
+          kubectl rollout status deployment/hello-gitops-green -n hello-gitops-new --timeout=300s
         else
-          kubectl rollout status deployment/hello-gitops-blue -n hello-gitops-new --timeout=120s
+          echo "Waiting for Blue deployment rollout"
+          kubectl rollout status deployment/hello-gitops-blue -n hello-gitops-new --timeout=300s
         fi
 
     - name: Switch traffic
       run: |
         if [[ "$active_version" == "blue" ]]; then
+          echo "Switching traffic to Green"
           kubectl patch service hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"green"}}}'
         else
+          echo "Switching traffic to Blue"
           kubectl patch service hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"blue"}}}'
         fi
+
+    - name: Validate traffic switch
+      run: |
+        service=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "Testing application at $service"
+        for i in {1..10}; do
+          curl -s "http://$service" && echo "Success!" && exit 0 || echo "Retrying..."
+          sleep 5
+        done
+        echo "Error: Application did not respond as expected."
+        exit 1
 
     - name: Cleanup old deployment
       run: |
         if [[ "$active_version" == "blue" ]]; then
+          echo "Deleting Blue deployment"
           kubectl delete deployment hello-gitops-blue -n hello-gitops-new
         else
+          echo "Deleting Green deployment"
           kubectl delete deployment hello-gitops-green -n hello-gitops-new
         fi
