@@ -1,7 +1,10 @@
-name: Blue/Green CI/CD Pipeline
+name: CI/CD Pipeline for Blue/Green Deployment
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
 
@@ -38,19 +41,19 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Docker image (blue)
+    - name: Build and push Docker image for Blue
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
-        tags: potopaa/hello-gitops:blue
+        tags: ${{ secrets.DOCKER_USERNAME }}/hello-gitops:blue
 
-    - name: Build and push Docker image (green)
+    - name: Build and push Docker image for Green
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
-        tags: potopaa/hello-gitops:green
+        tags: ${{ secrets.DOCKER_USERNAME }}/hello-gitops:green
 
   deploy-to-eks:
     runs-on: ubuntu-latest
@@ -69,22 +72,61 @@ jobs:
     - name: Update kubeconfig
       run: aws eks update-kubeconfig --region us-east-1 --name hello-gitops-new
 
-    - name: Deploy Blue
-      run: kubectl apply -f deployment-blue.yaml
+    - name: Create Namespace if not exists
+      run: |
+        kubectl create namespace hello-gitops-new || echo "Namespace already exists"
 
-    - name: Test Blue Deployment
-      run: kubectl rollout status deployment/hello-gitops-blue -n hello-gitops-new
+    - name: Deploy Blue Version
+      run: |
+        kubectl apply -f deployment-blue.yaml -n hello-gitops-new
 
-    - name: Deploy Green
-      run: kubectl apply -f deployment-green.yaml
+    - name: Wait for Blue Deployment to be Ready
+      run: |
+        kubectl rollout status deployment/hello-gitops-blue -n hello-gitops-new --timeout=120s
 
-    - name: Test Green Deployment
-      run: kubectl rollout status deployment/hello-gitops-green -n hello-gitops-new
+    - name: Deploy Green Version
+      run: |
+        kubectl apply -f deployment-green.yaml -n hello-gitops-new
+
+    - name: Wait for Green Deployment to be Ready
+      run: |
+        kubectl rollout status deployment/hello-gitops-green -n hello-gitops-new --timeout=120s
+
+    - name: Wait for LoadBalancer to be Ready
+      run: |
+        for i in {1..30}; do
+          service=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          if [[ -n "$service" ]]; then
+            echo "LoadBalancer ready: $service"
+            exit 0
+          fi
+          echo "Waiting for LoadBalancer to be ready..."
+          sleep 10
+        done
+        echo "Error: LoadBalancer not ready"
+        exit 1
 
     - name: Switch Traffic to Green
-      run: kubectl patch svc hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"green"}}}'
+      run: |
+        kubectl patch service hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"green"}}}'
 
-    - name: Validate Green Deployment
+    - name: Validate Deployment
       run: |
         service=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-        curl -s "http://$service"
+        if [[ -z "$service" ]]; then
+          echo "Error: LoadBalancer hostname not found."
+          exit 1
+        fi
+        for i in {1..10}; do
+          curl -s "http://$service" || exit 1
+          sleep 1
+        done
+
+    - name: Rollback to Blue if Validation Fails
+      if: failure()
+      run: |
+        kubectl patch service hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"blue"}}}'
+
+    - name: Clean Up Old Deployment (Optional)
+      run: |
+        kubectl delete deployment hello-gitops-blue -n hello-gitops-new
