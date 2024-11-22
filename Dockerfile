@@ -13,4 +13,4 @@ COPY config.properties /app/config.properties
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 
-CMD ["python", "hello.py"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8050", "hello:app"]
