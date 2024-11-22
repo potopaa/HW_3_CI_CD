@@ -8,6 +8,8 @@ WORKDIR /app
 
 COPY . .
 
+COPY config.properties /app/config.properties
+
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 
