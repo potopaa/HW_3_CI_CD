@@ -1,15 +1,16 @@
-
 apiVersion: v1
 kind: Service
 metadata:
+  name: hello-gitops
+  namespace: hello-gitops
   labels:
     app: hello-gitops
-  name: hello-gitops
 spec:
-  ports:
-    - name: http
-      port: 80
-      targetPort: 8050
+  type: LoadBalancer
   selector:
     app: hello-gitops
-  type: ClusterIP
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 8050
