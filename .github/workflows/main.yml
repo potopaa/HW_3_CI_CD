@@ -1,72 +1,138 @@
-name: CI/CD Pipeline
+name: GitOps CI/CD Workflow
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build-and-push-docker:
-    name: Build and Push Docker Image
+  build:
+
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Test with pytest
+      run: |
+        pytest
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+    
+    - uses: docker/login-action@v2 
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+      
+    - name: Build and push v1 image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./app 
+        file: ./app/Dockerfile
+        builder: ${{ steps.buildx.outputs.name }}
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/hello-gitops:v1
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache
 
-      - name: Log in to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Build and push v2 image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./app 
+        file: ./app/Dockerfile
+        builder: ${{ steps.buildx.outputs.name }}
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/hello-gitops:v2
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache
 
-      - name: Build and Push Docker Image for v1
-        run: |
-          docker build -t your-dockerhub-username/hello-gitops:v1 .
-          docker push your-dockerhub-username/hello-gitops:v1
-
-      - name: Build and Push Docker Image for v2
-        run: |
-          docker build -t your-dockerhub-username/hello-gitops:v2 .
-          docker push your-dockerhub-username/hello-gitops:v2
-
-  deploy-to-eks:
-    name: Deploy to EKS
-    needs: build-and-push-docker
+  deploy:
+    
+    name: Deploy
     runs-on: ubuntu-latest
+    needs: build
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Check out code
+      uses: actions/checkout@v2
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+    - name: Setup Kustomize
+      uses: imranismail/setup-kustomize@v1
+      with:
+        kustomize-version: "3.6.1"
 
-      - name: Install kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
+    - name: Update Kubernetes resources for v1
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      run: |
+        cd k8s
+        kustomize edit set namespace hello-gitops
+        kustomize edit set image hello-gitops=$DOCKER_USERNAME/hello-gitops:v1
+        cat kustomization.yaml
+        
+    - name: Commit files for v1
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -am "Deploy v1 image"
 
-      - name: Update kubeconfig for EKS
-        run: |
-          aws eks update-kubeconfig --region us-east-1 --name hello-gitops-new
+    - name: Push changes for v1
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy Kubernetes Resources
-        run: |
-          kubectl apply -k ./k8s/
+    - name: Update Kubernetes resources for v2
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      run: |
+        cd k8s
+        kustomize edit set namespace hello-gitops
+        kustomize edit set image hello-gitops=$DOCKER_USERNAME/hello-gitops:v2
+        cat kustomization.yaml
 
-      - name: Switch Traffic to v2
-        run: |
-          kubectl patch service hello-gitops -n hello-gitops -p '{"spec":{"selector":{"version":"v2.0.0"}}}'
+    - name: Commit files for v2
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -am "Deploy v2 image"
 
-      - name: Verify Deployment v2
-        run: |
-          kubectl rollout status deployment/hello-gitops-v2 -n hello-gitops
+    - name: Push changes for v2
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
