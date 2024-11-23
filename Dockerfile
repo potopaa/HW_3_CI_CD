@@ -8,7 +8,6 @@ WORKDIR /app
 
 COPY . .
 
-RUN apt-get update && apt-get install -y curl && apt-get clean
 COPY config.properties /app/config.properties
 
 RUN pip install --upgrade pip && pip install -r requirements.txt
