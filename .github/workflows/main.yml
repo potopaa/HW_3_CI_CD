@@ -41,17 +41,20 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Определить следующую версию
+    - name: Determine next version
+      id: determine-version
       run: |
         current_version=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "blue")
         if [[ "$current_version" == "blue" ]]; then
-          next_version="green"
+          echo "next_version=green" >> $GITHUB_ENV
         else
-          next_version="blue"
+          echo "next_version=blue" >> $GITHUB_ENV
         fi
-        echo "Building and pushing image for $next_version"
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/hello-gitops:$next_version .
-        docker push ${{ secrets.DOCKER_USERNAME }}/hello-gitops:$next_version
+
+    - name: Build and push Docker image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/hello-gitops:${{ env.next_version }} .
+        docker push ${{ secrets.DOCKER_USERNAME }}/hello-gitops:${{ env.next_version }}
 
   deploy-to-eks:
     runs-on: ubuntu-latest
@@ -72,7 +75,7 @@ jobs:
 
     - name: Deploy updated version
       run: |
-        if [[ "$next_version" == "green" ]]; then
+        if [[ "${{ env.next_version }}" == "green" ]]; then
           kubectl apply -f deployment-green.yaml -n hello-gitops-new
         else
           kubectl apply -f deployment-blue.yaml -n hello-gitops-new
@@ -80,5 +83,14 @@ jobs:
 
     - name: Switch traffic
       run: |
-        kubectl patch svc hello-gitops -n hello-gitops-new -p "{\"spec\":{\"selector\":{\"app\":\"hello-gitops\",\"version\":\"$next_version\"}}}"
+        kubectl patch svc hello-gitops -n hello-gitops-new -p "{\"spec\":{\"selector\":{\"app\":\"hello-gitops\",\"version\":\"${{ env.next_version }}\"}}}"
 
+    - name: Validate traffic switch
+      run: |
+        service=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        for i in {1..10}; do
+          curl -s "http://$service" && echo "Success!" && exit 0 || echo "Retrying..."
+          sleep 5
+        done
+        echo "Error: Application did not respond as expected."
+        exit 1
