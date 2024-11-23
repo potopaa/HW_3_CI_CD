@@ -20,3 +20,4 @@ spec:
         image: potopaa/hello-gitops:green
         ports:
         - containerPort: 8050
+
