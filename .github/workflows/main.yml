@@ -44,10 +44,13 @@ jobs:
     - name: Determine next version
       id: determine-version
       run: |
-        current_version=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "blue")
+        current_version=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "none")
         if [[ "$current_version" == "blue" ]]; then
           echo "next_version=green" >> $GITHUB_ENV
+        elif [[ "$current_version" == "green" ]]; then
+          echo "next_version=blue" >> $GITHUB_ENV
         else
+          echo "No active version detected. Deploying Blue first."
           echo "next_version=blue" >> $GITHUB_ENV
         fi
         echo "Next version: ${{ env.next_version }}"
@@ -103,9 +106,15 @@ jobs:
     - name: Validate traffic switch
       run: |
         service=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "Testing application at $service"
         for i in {1..10}; do
-          curl -s "http://$service" && echo "Success!" && exit 0 || echo "Retrying..."
-          sleep 5
+          if curl -s "http://$service"; then
+            echo "Success!"
+            exit 0
+          else
+            echo "Retrying..."
+            sleep 5
+          fi
         done
         echo "Error: Application did not respond as expected."
         exit 1
