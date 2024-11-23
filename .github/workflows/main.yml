@@ -81,3 +81,4 @@ jobs:
     - name: Switch traffic
       run: |
         kubectl patch svc hello-gitops -n hello-gitops-new -p "{\"spec\":{\"selector\":{\"app\":\"hello-gitops\",\"version\":\"$next_version\"}}}"
+
