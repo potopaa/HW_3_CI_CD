@@ -11,3 +11,4 @@ spec:
     port: 80
     targetPort: 8050
   type: LoadBalancer
+
