@@ -20,3 +20,4 @@ spec:
         image: potopaa/hello-gitops:blue
         ports:
         - containerPort: 8050
+
