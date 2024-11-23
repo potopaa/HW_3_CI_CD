@@ -4,8 +4,10 @@ metadata:
   name: hello-gitops
   namespace: hello-gitops-new
 spec:
+  type: LoadBalancer
   selector:
     app: hello-gitops
+    version: blue  
   ports:
   - protocol: TCP
     port: 80
