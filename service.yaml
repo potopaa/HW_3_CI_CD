@@ -2,12 +2,15 @@ apiVersion: v1
 kind: Service
 metadata:
   name: hello-gitops
-  namespace: hello-gitops-new
+  namespace: hello-gitops
+  labels:
+    app: hello-gitops
 spec:
+  type: LoadBalancer
   selector:
     app: hello-gitops
   ports:
-  - protocol: TCP
+  - name: http
+    protocol: TCP
     port: 80
     targetPort: 8050
-  type: LoadBalancer

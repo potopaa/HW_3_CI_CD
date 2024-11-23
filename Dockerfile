@@ -1,13 +1,12 @@
 FROM python:3.8-slim
 
-RUN apt-get update && apt-get install -y curl && apt-get clean
-
 WORKDIR /app
 
+RUN groupadd -r webservice && useradd --no-log-init -r -g webservice webservice
 COPY . .
-
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
+USER webservice:webservice
 EXPOSE 8050
 
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8050", "hello:app"]
+CMD ["python", "hello.py"]
