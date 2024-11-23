@@ -130,4 +130,3 @@ jobs:
           echo "Deleting Green deployment"
           kubectl delete deployment hello-gitops-green -n hello-gitops-new
         fi
-
