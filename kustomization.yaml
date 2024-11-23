@@ -9,4 +9,3 @@ images:
 - name: hello-gitops
   newName: potopaa/hello-gitops
   newTag: latest
-

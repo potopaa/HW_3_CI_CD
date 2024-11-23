@@ -3,9 +3,6 @@ kind: Deployment
 metadata:
   name: hello-gitops-green
   namespace: hello-gitops-new
-  labels:
-    app: hello-gitops
-    version: green
 spec:
   replicas: 3
   selector:
@@ -23,9 +20,3 @@ spec:
         image: potopaa/hello-gitops:green
         ports:
         - containerPort: 8050
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 8050
-          initialDelaySeconds: 5
-          periodSeconds: 10

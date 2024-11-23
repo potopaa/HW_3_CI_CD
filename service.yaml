@@ -6,7 +6,6 @@ metadata:
 spec:
   selector:
     app: hello-gitops
-    version: blue
   ports:
   - protocol: TCP
     port: 80
