@@ -8,4 +8,3 @@ namespace: hello-gitops
 images:
 - name: hello-gitops
   newName: potopaa/hello-gitops
-  newTag: "${NEXT_VERSION}"
