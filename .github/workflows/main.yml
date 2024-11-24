@@ -1,5 +1,3 @@
-
-
 name: CI/CD Pipeline
 
 on:
@@ -43,12 +41,28 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
+    - name: Determine next version
+      id: determine-version
+      run: |
+        current_version=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "none")
+        if [[ "$current_version" == "blue" ]]; then
+          echo "next_version=green" >> $GITHUB_ENV
+        elif [[ "$current_version" == "green" ]]; then
+          echo "next_version=blue" >> $GITHUB_ENV
+        else
+          echo "No active version detected. Defaulting to blue."
+          echo "next_version=blue" >> $GITHUB_ENV
+        fi
+        echo "Next version: ${{ env.next_version }}"
+
     - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/hello-gitops:latest
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/hello-gitops:${{ env.next_version }} .
+        docker push ${{ secrets.DOCKER_USERNAME }}/hello-gitops:${{ env.next_version }}
+
+    - name: Update kustomization.yaml with next version
+      run: |
+        sed -i "s/\${NEXT_VERSION}/${{ env.next_version }}/g" kustomization.yaml
 
   deploy-to-eks:
     runs-on: ubuntu-latest
@@ -67,48 +81,30 @@ jobs:
     - name: Update kubeconfig
       run: aws eks update-kubeconfig --region us-east-1 --name hello-gitops-new
 
-    - name: Test kubectl connection
-      run: kubectl get nodes
-
-    - name: Determine active version
-      id: active-version
+    - name: Deploy updated version
       run: |
-        active_version=$(kubectl get svc hello-gitops -n hello-gitops-new -o jsonpath='{.spec.selector.version}')
-        if [[ -z "$active_version" ]]; then
-          echo "No active version detected. Defaulting to blue."
-          active_version="blue"
-        fi
-        echo "active_version=${active_version}" >> $GITHUB_ENV
-        echo "Current active version: ${active_version}"
-
-    - name: Deploy next version
-      run: |
-        if [[ "$active_version" == "blue" ]]; then
-          echo "Deploying Green version"
+        if [[ "${{ env.next_version }}" == "green" ]]; then
           kubectl apply -f deployment-green.yaml -n hello-gitops-new
         else
-          echo "Deploying Blue version"
           kubectl apply -f deployment-blue.yaml -n hello-gitops-new
         fi
 
     - name: Wait for rollout
       run: |
-        if [[ "$active_version" == "blue" ]]; then
-          echo "Waiting for Green deployment rollout"
+        if [[ "${{ env.next_version }}" == "green" ]]; then
           kubectl rollout status deployment/hello-gitops-green -n hello-gitops-new --timeout=300s
         else
-          echo "Waiting for Blue deployment rollout"
           kubectl rollout status deployment/hello-gitops-blue -n hello-gitops-new --timeout=300s
         fi
 
     - name: Switch traffic
       run: |
-        if [[ "$active_version" == "blue" ]]; then
+        if [[ "${{ env.next_version }}" == "green" ]]; then
           echo "Switching traffic to Green"
-          kubectl patch service hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"green"}}}'
+          kubectl patch svc hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"green"}}}'
         else
           echo "Switching traffic to Blue"
-          kubectl patch service hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"blue"}}}'
+          kubectl patch svc hello-gitops -n hello-gitops-new -p '{"spec":{"selector":{"app":"hello-gitops","version":"blue"}}}'
         fi
 
     - name: Validate traffic switch
@@ -124,10 +120,10 @@ jobs:
 
     - name: Cleanup old deployment
       run: |
-        if [[ "$active_version" == "blue" ]]; then
-          echo "Deleting Blue deployment"
-          kubectl delete deployment hello-gitops-blue -n hello-gitops-new
+        if [[ "${{ env.next_version }}" == "green" ]]; then
+          echo "Cleaning up Blue deployment"
+          kubectl delete deployment hello-gitops-blue -n hello-gitops-new || echo "No Blue deployment to delete"
         else
-          echo "Deleting Green deployment"
-          kubectl delete deployment hello-gitops-green -n hello-gitops-new
+          echo "Cleaning up Green deployment"
+          kubectl delete deployment hello-gitops-green -n hello-gitops-new || echo "No Green deployment to delete"
         fi
